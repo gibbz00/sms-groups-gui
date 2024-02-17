@@ -8,6 +8,10 @@ There are some things that should be kept in mind when contributing to this proj
 
 Structure requirements on commit messages, issues and pull requests are other than that pretty relaxed, (for now 🤞).
 
+#### Creating DB structs
+
+The primary key field for structs in databases should generally be named `id` in order to play nicely with how most databases infer them.
+
 ### Using pre-commit hooks
 
  Using a pre-commit hook to locally check simpler CI validation steps is encouraged to avoid commit squash requests by the maintainers, but also `git commit --amend && git push --force` abuse. This can be achieved by pasting the following into `.git/hooks/pre-commit`:
@@ -41,6 +45,9 @@ Pretty standard procedure apart from noting that some tests are behind feature f
 ```sh
 cargo test --all-features
 ```
+
+Some tests use [testcontainters](https://docs.rs/testcontainers/latest/testcontainers/) which in turn uses the docker CLI.
+Make in other words sure that it is both installed and able to run without root.
 
 ### Generating and opening documentation
 

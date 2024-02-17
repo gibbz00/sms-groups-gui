@@ -1,4 +1,3 @@
-use anyhow::Context;
 use poem::{listener::TcpListener, middleware::Tracing, EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
 use sms_groups_common::*;
@@ -11,12 +10,8 @@ pub struct RestServer<D: DbBackend> {
 }
 
 impl<D: DbBackend> RestServer<D> {
-    pub async fn new() -> anyhow::Result<Self> {
-        Ok(Self {
-            db: D::client()
-                .await
-                .with_context(|| format!("Failed to initialize database backend client, using {}", std::any::type_name::<D>()))?,
-        })
+    pub async fn new(db: D) -> anyhow::Result<Self> {
+        Ok(Self { db })
     }
 
     pub async fn seed(self) -> anyhow::Result<()> {
@@ -31,7 +26,7 @@ impl<D: DbBackend> RestServer<D> {
             idp: organization.idp,
         };
 
-        self.db.create(root_organization).await?;
+        self.db.create_document(&root_organization).await?;
 
         let root_admin = Admin {
             id: admin.id,
@@ -39,7 +34,7 @@ impl<D: DbBackend> RestServer<D> {
             organization: organization_id,
         };
 
-        self.db.create(root_admin).await?;
+        self.db.create_document(&root_admin).await?;
 
         Ok(())
     }
@@ -62,5 +57,22 @@ impl<D: DbBackend> RestServer<D> {
         Server::new(TcpListener::bind(&address)).run(app).await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn seeds_root_credentials() {
+        DefaultDbBackend::in_test_container(|db| async move {
+            RestServer::<DefaultDbBackend>::new(db.clone()).await.unwrap().seed().await.unwrap();
+
+            let admin_id = SmsGroupsConfig::read().unwrap().api.root_credentials.admin.id;
+            let admin = db.get_document::<Admin>(admin_id).await.unwrap().unwrap();
+            assert!(db.get_document::<Organization>(admin.organization).await.unwrap().is_some());
+        })
+        .await;
     }
 }

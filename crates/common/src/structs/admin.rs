@@ -12,8 +12,9 @@ pub struct Admin {
 
 impl DbDocument for Admin {
     const NAME: &'static str = "admins";
+    type Id = Uuid;
 
-    fn id(&self) -> impl Into<String> {
+    fn id(&self) -> Self::Id {
         self.id
     }
 }

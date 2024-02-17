@@ -15,8 +15,9 @@ pub struct Organization {
 
 impl DbDocument for Organization {
     const NAME: &'static str = "organizations";
+    type Id = Uuid;
 
-    fn id(&self) -> impl Into<String> {
+    fn id(&self) -> Self::Id {
         self.id
     }
 }

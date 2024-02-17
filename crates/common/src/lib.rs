@@ -17,3 +17,13 @@ pub use paths::ProjectPaths;
 mod instrumentation;
 pub use instrumentation::Instrumentation;
 pub(crate) use instrumentation::*;
+
+#[cfg(feature = "test-utils")]
+mod test_containers;
+#[cfg(feature = "test-utils")]
+pub use test_containers::TestContainer;
+
+#[cfg(feature = "test-utils")]
+mod test_connection;
+#[cfg(feature = "test-utils")]
+pub use test_connection::TestConnection;

@@ -11,8 +11,3 @@ pub use default_backend::DefaultDbBackend;
 mod surrealdb;
 #[cfg(feature = "surrealdb")]
 pub(crate) use surrealdb::SurrealBackend;
-
-#[cfg(test)]
-mod test_suite;
-#[cfg(test)]
-pub(crate) use test_suite::DbBackendTestSuite;

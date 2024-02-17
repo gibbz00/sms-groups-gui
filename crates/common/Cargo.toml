@@ -11,6 +11,8 @@ version.workspace = true
 default = ["surrealdb"]
 surrealdb = ["dep:surrealdb"]
 
+test-utils = ["dep:testcontainers", "dep:testcontainers-modules"]
+
 [lints]
 workspace = true
 
@@ -27,6 +29,10 @@ uuid.workspace = true
 
 # SURREALDB
 surrealdb = { workspace = true, optional = true }
+
+# TEST_UTILS
+testcontainers = { workspace = true, optional = true }
+testcontainers-modules = { workspace = true, optional = true, features = ["surrealdb"] }
 
 [dev-dependencies]
 pathdiff.workspace = true

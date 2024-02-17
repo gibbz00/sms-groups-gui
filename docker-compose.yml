@@ -1,9 +1,9 @@
 version: '3.8'
 services:
   surrealdb:
-    image: surrealdb/surrealdb:latest
+    image: surrealdb/surrealdb:v1.2.0
     restart: unless-stopped
     # NOTE: Defaults to in memory db:
-    command: start --auth --user root --pass root --strict --log debug
+    command: start --auth --user root --pass root --log debug
     ports:
       - 8000:8000
