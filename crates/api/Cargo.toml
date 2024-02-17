@@ -1,5 +1,5 @@
 [package]
-name = "sms-groups-gui"
+name = "sms-groups-api"
 authors.workspace = true
 repository.workspace = true
 exclude.workspace = true
@@ -9,6 +9,6 @@ version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-# serde.workspace = true
-# thiserror.workspace = true
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+poem.workspace = true
+poem-openapi.workspace = true
