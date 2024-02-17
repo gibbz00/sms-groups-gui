@@ -7,6 +7,9 @@ edition.workspace = true
 readme.workspace = true
 version.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 sms-groups-common = { path = "../common" }
 

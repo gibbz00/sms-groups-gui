@@ -15,7 +15,7 @@ impl Api {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    setup_observability!()?;
+    let _observability_guard = setup_observability!()?;
 
     let api_config = SmsGroupsConfig::read()?.api;
     let address = api_config.combined_address();
