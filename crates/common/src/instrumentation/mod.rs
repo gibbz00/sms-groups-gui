@@ -1,5 +1,5 @@
 mod core;
-pub use core::Observability;
+pub use core::Instrumentation;
 
 mod layers;
 pub(crate) use layers::*;

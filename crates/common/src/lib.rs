@@ -6,6 +6,6 @@ pub use config::*;
 mod paths;
 pub use paths::ProjectPaths;
 
-mod observability;
-pub use observability::Observability;
-pub(crate) use observability::*;
+mod instrumentation;
+pub use instrumentation::Instrumentation;
+pub(crate) use instrumentation::*;
