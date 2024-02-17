@@ -1,5 +1,5 @@
 [package]
-name = "sms-groups-api"
+name = "sms-groups-common"
 authors.workspace = true
 repository.workspace = true
 exclude.workspace = true
@@ -8,9 +8,9 @@ readme.workspace = true
 version.workspace = true
 
 [dependencies]
-sms-groups-common = { path = "../common" }
-
 anyhow.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-poem.workspace = true
-poem-openapi.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
+
+[dev-dependencies]
+pathdiff.workspace = true
