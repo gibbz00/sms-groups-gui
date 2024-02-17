@@ -18,6 +18,7 @@ tracing.workspace = true
 tracing-appender.workspace = true
 tracing-panic.workspace = true
 tracing-subscriber.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 pathdiff.workspace = true

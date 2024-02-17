@@ -1,5 +1,8 @@
 #![feature(lazy_cell)]
 
+mod structs;
+pub use structs::*;
+
 mod config;
 pub use config::*;
 

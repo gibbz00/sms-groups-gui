@@ -26,7 +26,7 @@ pub(crate) mod file_layer {
     where
         S: Subscriber + for<'a> LookupSpan<'a>,
     {
-        let observability_config = SmsGroupsConfig::read()?.observability;
+        let observability_config = SmsGroupsConfig::read()?.instrumentation;
 
         let path = observability_config.log_dir.join(format!("{service_name}.log"));
 
