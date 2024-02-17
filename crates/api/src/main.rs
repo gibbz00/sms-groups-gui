@@ -19,12 +19,17 @@ async fn main() -> anyhow::Result<()> {
 
     let api_config = SmsGroupsConfig::read()?.api;
     let address = api_config.combined_address();
+    let OpenApiConfig {
+        service_name,
+        swagger_ui_path,
+        version,
+    } = api_config.open_api;
 
-    let api_service = OpenApiService::new(Api, api_config.service_name, api_config.version).server(&address);
-    let ui = api_service.swagger_ui();
+    let api_service = OpenApiService::new(Api, service_name, version).server(&address);
+    let swagger_ui = api_service.swagger_ui();
     let app = Route::new()
         .nest("/", api_service.with(Tracing))
-        .nest(api_config.swagger_ui_path, ui.with(Tracing));
+        .nest(swagger_ui_path, swagger_ui.with(Tracing));
 
     Server::new(TcpListener::bind(&address)).run(app).await?;
 

@@ -2,7 +2,7 @@ mod core;
 pub use core::SmsGroupsConfig;
 
 mod observability;
-pub(crate) use observability::ObservabilityConfig;
+pub use observability::ObservabilityConfig;
 
 mod api;
-pub(crate) use api::ApiConfig;
+pub use api::{ApiConfig, OpenApiConfig};
