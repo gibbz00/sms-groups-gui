@@ -1,6 +1,9 @@
 mod core;
 pub use core::DbBackend;
 
+mod document;
+pub(crate) use document::DbDocument;
+
 mod default_backend;
 pub use default_backend::DefaultDbBackend;
 

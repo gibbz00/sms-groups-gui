@@ -7,11 +7,16 @@ edition.workspace = true
 readme.workspace = true
 version.workspace = true
 
+[features]
+default = ["surrealdb"]
+surrealdb = ["dep:surrealdb"]
+
 [lints]
 workspace = true
 
 [dependencies]
 anyhow.workspace = true
+poem-openapi.workspace = true
 serde.workspace = true
 serde_yaml.workspace = true
 tracing.workspace = true
@@ -20,5 +25,9 @@ tracing-panic.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
 
+# SURREALDB
+surrealdb = { workspace = true, optional = true }
+
 [dev-dependencies]
 pathdiff.workspace = true
+tokio.workspace = true

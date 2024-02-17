@@ -1,2 +1,5 @@
 mod organization;
-pub use organization::Organization;
+pub use organization::{CreateOrganization, Organization};
+
+mod admin;
+pub use admin::Admin;

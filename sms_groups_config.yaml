@@ -16,3 +16,10 @@ api:
     port: 8000
     namespace: "default"
     database: "sms_groups"
+  root_credentials:
+    organization:
+      name: "Gotanet"
+      idp: "<keymaker>"
+    admin:
+      name: "admin"
+      id: "9442a1d3-c686-4e6d-869d-ed3f6265aad4"

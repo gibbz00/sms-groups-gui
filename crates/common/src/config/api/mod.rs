@@ -6,3 +6,6 @@ pub use open_api::OpenApiConfig;
 
 mod surrealdb;
 pub use surrealdb::SurrealDbConfig;
+
+mod root_credentials;
+pub use root_credentials::RootCredentials;
