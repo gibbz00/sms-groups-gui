@@ -1,3 +1,4 @@
+use sms_groups_api::*;
 use sms_groups_common::*;
 
 use poem::{listener::TcpListener, middleware::Tracing, EndpointExt, Route, Server};
@@ -16,6 +17,8 @@ impl Api {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _observability_guard = setup_observability!()?;
+
+    let _db_client = DefaultDbBackend::client();
 
     let api_config = SmsGroupsConfig::read()?.api;
     let address = api_config.server.combined_address();
