@@ -15,19 +15,20 @@ pub(crate) mod stdout_layer {
 }
 
 pub(crate) mod file_layer {
-    use std::path::Path;
-
     use anyhow::Context;
     use tracing::Subscriber;
     use tracing_appender::non_blocking::WorkerGuard;
     use tracing_subscriber::{registry::LookupSpan, Layer};
 
+    use crate::SmsGroupsConfig;
+
     pub fn setup<S>(service_name: &str) -> anyhow::Result<(impl Layer<S>, WorkerGuard)>
     where
         S: Subscriber + for<'a> LookupSpan<'a>,
     {
-        // TODO: use config
-        let path = Path::new("/var/log").join(format!("{service_name}.log"));
+        let observability_config = SmsGroupsConfig::read()?.observability;
+
+        let path = observability_config.log_dir.join(format!("{service_name}.log"));
 
         let log_file = std::fs::OpenOptions::new()
             .append(true)

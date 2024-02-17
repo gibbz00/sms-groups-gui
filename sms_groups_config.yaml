@@ -1,3 +1,6 @@
+observability:
+  log_dir: "/var/log"
+
 api:
   service_name: "SMS Groups API"
   swagger_ui_path: /swagger-ui

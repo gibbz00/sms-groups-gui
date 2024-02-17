@@ -10,6 +10,7 @@ const CONFIG_PATH: &str = "sms_groups_config.yaml";
 
 #[derive(Debug, Deserialize)]
 pub struct SmsGroupsConfig {
+    pub observability: ObservabilityConfig,
     pub api: ApiConfig,
 }
 
