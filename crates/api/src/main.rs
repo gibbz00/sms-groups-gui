@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let _observability_guard = setup_observability!()?;
 
     let api_config = SmsGroupsConfig::read()?.api;
-    let address = api_config.combined_address();
+    let address = api_config.server.combined_address();
     let OpenApiConfig {
         service_name,
         swagger_ui_path,

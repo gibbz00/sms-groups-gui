@@ -15,7 +15,7 @@ pub struct SmsGroupsConfig {
 }
 
 impl SmsGroupsConfig {
-    pub fn config_path() -> PathBuf {
+    fn config_path() -> PathBuf {
         ProjectPaths::repo_root().join(CONFIG_PATH)
     }
 

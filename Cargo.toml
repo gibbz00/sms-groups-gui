@@ -12,18 +12,20 @@ version = "0.1.0"
 
 [workspace.dependencies]
 anyhow = "1"
-# chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 # derive_more = "0.99"
+pathdiff = "0.2"
 poem = { version = "2", features = ["anyhow"] }
 poem-openapi = { version = "4", features = ["uuid", "chrono", "swagger-ui"] }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
+surrealdb = "1"
 tokio = { version = "1" }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-panic = "0.1.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-pathdiff = "0.2"
+uuid = { version = "1", features = ["serde", "v4", "fast-rng"] }
 
 [workspace.lints.rust]
 unused_must_use = "deny"

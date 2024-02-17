@@ -7,6 +7,10 @@ edition.workspace = true
 readme.workspace = true
 version.workspace = true
 
+[features]
+default = ["surrealdb"]
+surrealdb = ["dep:surrealdb"]
+
 [lints]
 workspace = true
 
@@ -17,3 +21,6 @@ anyhow.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 poem.workspace = true
 poem-openapi.workspace = true
+
+# SURREALDB
+surrealdb = { workspace = true, optional = true }
