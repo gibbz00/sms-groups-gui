@@ -1,25 +1,21 @@
+use bson::oid::ObjectId;
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::*;
 
 #[derive(Serialize, Deserialize, Object)]
 pub struct Organization {
-    pub id: Uuid,
+    pub id: ObjectId,
     /// None if root organization.
-    pub parent_id: Option<Uuid>,
+    pub parent_id: Option<ObjectId>,
     pub name: String,
     pub idp: String,
 }
 
-impl DbDocument for Organization {
-    const NAME: &'static str = "organizations";
-    type Id = Uuid;
-
-    fn id(&self) -> Self::Id {
-        self.id
-    }
+impl MongoDbDocument for Organization {
+    const COLLECTION_NAME: &'static str = "organization";
+    type Id = ObjectId;
 }
 
 #[derive(Debug, Deserialize)]

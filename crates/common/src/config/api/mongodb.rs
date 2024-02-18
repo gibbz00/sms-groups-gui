@@ -3,11 +3,9 @@ use serde::Deserialize;
 use crate::*;
 
 #[derive(Debug, Deserialize)]
-pub struct SurrealDbConfig {
-    pub username: String,
-    pub password: String,
+pub struct MongoDbConfig {
     #[serde(flatten)]
     pub host_port: HostPort,
-    pub namespace: String,
+    pub application: String,
     pub database: String,
 }

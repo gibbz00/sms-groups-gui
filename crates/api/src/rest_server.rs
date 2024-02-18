@@ -1,37 +1,36 @@
+use bson::oid::ObjectId;
 use poem::{listener::TcpListener, middleware::Tracing, EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
 use sms_groups_common::*;
-use uuid::Uuid;
 
 use crate::*;
 
-pub struct RestServer<D: DbBackend> {
-    db: D,
+pub struct RestServer {
+    db: MongoDbClient,
 }
 
-impl<D: DbBackend> RestServer<D> {
-    pub async fn new(db: D) -> anyhow::Result<Self> {
+impl RestServer {
+    pub async fn new(db: MongoDbClient) -> anyhow::Result<Self> {
         Ok(Self { db })
     }
 
     pub async fn seed(self) -> anyhow::Result<()> {
         let RootCredentials { organization, admin } = SmsGroupsConfig::read()?.api.root_credentials;
 
-        let organization_id = Uuid::new_v4();
-
         let root_organization = Organization {
-            id: organization_id,
+            id: ObjectId::new(),
             parent_id: None,
             name: organization.name,
             idp: organization.idp,
         };
 
-        self.db.create_document(&root_organization).await?;
+        let created_organization_id = self.db.create_document(&root_organization).await?;
 
         let root_admin = Admin {
-            id: admin.id,
+            id: ObjectId::new(),
+            idp_id: admin.idp_id,
             name: admin.name,
-            organization: organization_id,
+            organization: created_organization_id,
         };
 
         self.db.create_document(&root_admin).await?;
@@ -62,15 +61,19 @@ impl<D: DbBackend> RestServer<D> {
 
 #[cfg(test)]
 mod tests {
+    use futures::prelude::*;
+
     use super::*;
 
     #[tokio::test]
     async fn seeds_root_credentials() {
-        DefaultDbBackend::in_test_container(|db| async move {
-            RestServer::<DefaultDbBackend>::new(db.clone()).await.unwrap().seed().await.unwrap();
+        MongoDbClient::in_test_container(|db| async move {
+            RestServer::new(db.clone()).await.unwrap().seed().await.unwrap();
 
-            let admin_id = SmsGroupsConfig::read().unwrap().api.root_credentials.admin.id;
-            let admin = db.get_document::<Admin>(admin_id).await.unwrap().unwrap();
+            let admin_id = SmsGroupsConfig::read().unwrap().api.root_credentials.admin.idp_id;
+            let admin = db.stream::<Admin>(None).await.unwrap().next().await.unwrap().unwrap();
+
+            assert_eq!(admin.idp_id, admin_id);
             assert!(db.get_document::<Organization>(admin.organization).await.unwrap().is_some());
         })
         .await;

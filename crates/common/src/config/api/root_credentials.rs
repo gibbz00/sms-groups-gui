@@ -1,5 +1,5 @@
+use bson::Uuid;
 use serde::Deserialize;
-use uuid::Uuid;
 
 use crate::*;
 
@@ -12,5 +12,5 @@ pub struct RootCredentials {
 #[derive(Debug, Deserialize)]
 pub struct RootAdminCredentials {
     pub name: String,
-    pub id: Uuid,
+    pub idp_id: Uuid,
 }

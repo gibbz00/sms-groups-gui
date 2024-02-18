@@ -1,20 +1,17 @@
+use bson::{oid::ObjectId, Uuid};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct Admin {
-    pub id: Uuid,
+    pub id: ObjectId,
+    pub idp_id: Uuid,
     pub name: String,
-    pub organization: Uuid,
+    pub organization: ObjectId,
 }
 
-impl DbDocument for Admin {
-    const NAME: &'static str = "admins";
-    type Id = Uuid;
-
-    fn id(&self) -> Self::Id {
-        self.id
-    }
+impl MongoDbDocument for Admin {
+    const COLLECTION_NAME: &'static str = "admin";
+    type Id = ObjectId;
 }

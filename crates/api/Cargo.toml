@@ -22,6 +22,8 @@ workspace = true
 sms-groups-common = { path = "../common" }
 
 anyhow.workspace = true
+bson.workspace = true
+futures.workspace = true
 serde.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 uuid.workspace = true
