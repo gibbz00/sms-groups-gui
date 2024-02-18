@@ -10,7 +10,7 @@ Structure requirements on commit messages, issues and pull requests are other th
 
 #### Creating DB structs
 
-The primary key field for structs in databases should generally be named `id` in order to play nicely with how most databases infer them.
+The primary key field for structs in databases should generally be serialized to `_id` in order to play nicely with MongoDB.
 
 ### Using pre-commit hooks
 

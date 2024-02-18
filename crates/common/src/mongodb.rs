@@ -1,6 +1,6 @@
 pub use core::MongoDbClient;
 mod core {
-    use ::mongodb::options::{ClientOptions, Credential};
+    use ::mongodb::options::ClientOptions;
     use ::mongodb::{error::Error as MongoDbError, Client, Collection, Database};
     use bson::{doc, Bson, Document};
     use derive_more::Deref;
@@ -73,6 +73,7 @@ mod core {
 
         #[derive(Debug, PartialEq, Serialize, Deserialize)]
         struct MockDocument {
+            #[serde(rename = "_id")]
             id: ObjectId,
             value: usize,
         }
@@ -95,7 +96,8 @@ mod core {
         async fn creates_document() {
             MongoDbClient::in_test_container(|db| async move {
                 let mock = MockDocument::new();
-                db.create_document(&mock).await.unwrap();
+                let created_id = db.create_document(&mock).await.unwrap();
+                assert_eq!(mock.id, created_id);
             })
             .await;
         }

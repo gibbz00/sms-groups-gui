@@ -6,6 +6,7 @@ use crate::*;
 
 #[derive(Serialize, Deserialize, Object)]
 pub struct Organization {
+    #[serde(rename = "_id")]
     pub id: ObjectId,
     /// None if root organization.
     pub parent_id: Option<ObjectId>,
