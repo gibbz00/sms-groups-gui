@@ -1,15 +1,14 @@
 use std::{ops::Deref, sync::LazyLock};
 
 use anyhow::Context;
+use bson::oid::ObjectId;
 use hmac::{digest::KeyInit, Hmac};
 use jwt::SignWithKey;
 use poem_openapi::{param::Query, payload::PlainText, OpenApi};
-use serde::{Deserialize, Serialize};
 
 pub struct RestService;
 
 /*
-
     1. Create a client at the IDM:
     ```sh
     kanidm system oauth2 create sms_groups_client "SMS Grupper API" "https://redirectmeto.com"
@@ -43,34 +42,45 @@ const CLIENT_ORIGIN: &str = "https://redirectmeto.com";
 const REAL_ORIGIN: &str = "http://localhost:3000";
 
 const JWT_SIGNATURE_SECRET: &[u8] = b"super_secret";
+static JWT_SIGNING_KEY: LazyLock<Hmac<Sha256>> =
+    LazyLock::new(|| Hmac::<Sha256>::new_from_slice(JWT_SIGNATURE_SECRET).expect("unable to create JWT signing key"));
+
+static REQWEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("invalid request builder setup")
+});
 
 #[OpenApi]
 impl RestService {
     #[oai(path = "/user/login", method = "get")]
     async fn login(&self) -> PlainText<String> {
-        let url = generate_authorization_request_url();
+        // TODO: add  organization parameter
+        let url = generate_authorization_request_url(Group::User);
+
         return PlainText(format!("Please login at: {url}"));
 
-        fn generate_authorization_request_url() -> String {
+        fn generate_authorization_request_url(group: Group) -> String {
             format!(
-                "{}?client_id={}&redirect_uri={}&scope={}&response_type=code&state={}",
+                "{}?client_id={}&redirect_uri={}&scope={}&response_type=code&state=hejs",
                 OAUTH2_AUTH_ENDPOINT,
                 CLIENT_ID,
-                redirect_uri(),
-                scopes_string(&["openid", "user"]),
-                state()
+                redirect_uri(group),
+                ["openid", group.as_ref()].join(" "),
             )
         }
     }
 
-    #[oai(path = "/redirect", method = "get", hidden)]
-    async fn redirect(&self, Query(state): Query<String>, Query(code): Query<String>) -> poem::Result<PlainText<String>> {
-        println!("state: {}", state);
+    #[oai(path = "/user/redirect", method = "get", hidden)]
+    // State query string could also be extracted.
+    async fn redirect(&self, Query(code): Query<String>) -> poem::Result<PlainText<String>> {
+        let group = Group::User;
 
         let response = REQWEST_CLIENT
             .post(OAUTH2_TOKEN_ENDPOINT)
             .basic_auth(CLIENT_ID, Some(CLIENT_PASS))
-            .form(&token_request_form(code))
+            .form(&token_request_form(code, group))
             .send()
             .await
             .context("unable to send token request")?
@@ -82,38 +92,23 @@ impl RestService {
 
         validate_response(&response)?;
 
-        let sms_groups_jwt = create_sms_groups_jwt(&response)?;
+        let sms_groups_jwt = create_sms_groups_jwt(&response, group)?;
 
         return Ok(PlainText(format!("Bearer token: {}", sms_groups_jwt)));
 
-        fn token_request_form(code: String) -> impl Serialize {
+        fn token_request_form(code: String, group: Group) -> impl Serialize {
             [
                 ("grant_type", "authorization_code".to_string()),
                 ("code", code),
                 // Must be identical to the authorization request, but isn't being used by the token endpoint for redirection.
-                ("redirect_uri", redirect_uri()),
+                ("redirect_uri", redirect_uri(group)),
             ]
         }
     }
 }
 
-static REQWEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .build()
-        .expect("invalid request builder setup")
-});
-
-fn redirect_uri() -> String {
-    format!("{CLIENT_ORIGIN}/{REAL_ORIGIN}/redirect")
-}
-
-fn scopes_string(scopes: &[&str]) -> String {
-    scopes.join(" ")
-}
-
-fn state() -> String {
-    "hejs".to_string()
+fn redirect_uri(group: Group) -> String {
+    format!("{}/{}/{}/redirect", CLIENT_ORIGIN, REAL_ORIGIN, group.as_ref())
 }
 
 fn validate_response(_response: &str) -> anyhow::Result<()> {
@@ -121,22 +116,28 @@ fn validate_response(_response: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-static JWT_SIGNING_KEY: LazyLock<Hmac<Sha256>> =
-    LazyLock::new(|| Hmac::<Sha256>::new_from_slice(JWT_SIGNATURE_SECRET).expect("unable to create JWT signing key"));
-
-fn create_sms_groups_jwt(_response: &str) -> anyhow::Result<String> {
+fn create_sms_groups_jwt(_response: &str, group: Group) -> anyhow::Result<String> {
     // TODO: map expriy etc.
-    SmsGroupsJwt::mock().sign_with_key(JWT_SIGNING_KEY.deref()).map_err(Into::into)
+
+    // TODO: retrieve username from response and lookup in user database
+    // fn find_user_id(username: &str) -> ObjectId
+    let mock_user_id = ObjectId::new();
+
+    SmsGroupsJwt { group, id: mock_user_id }
+        .sign_with_key(JWT_SIGNING_KEY.deref())
+        .map_err(Into::into)
 }
 
+use serde::Serialize;
 use sha2::Sha256;
-pub use sms_groups_jwt::SmsGroupsJwt;
+pub use sms_groups_jwt::{Group, SmsGroupsJwt};
 mod sms_groups_jwt {
     use bson::oid::ObjectId;
+    use serde::{Deserialize, Serialize};
+    use strum::AsRefStr;
 
-    use super::*;
-
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize, AsRefStr)]
+    #[strum(serialize_all = "kebab-case")]
     pub enum Group {
         Admin,
         User,
@@ -144,16 +145,7 @@ mod sms_groups_jwt {
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct SmsGroupsJwt {
-        group: Group,
-        id: ObjectId,
-    }
-
-    impl SmsGroupsJwt {
-        pub fn mock() -> Self {
-            Self {
-                group: Group::User,
-                id: ObjectId::new(),
-            }
-        }
+        pub group: Group,
+        pub id: ObjectId,
     }
 }
