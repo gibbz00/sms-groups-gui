@@ -1,3 +1,5 @@
+#![feature(lazy_cell)]
+
 mod rest_service;
 pub(crate) use rest_service::RestService;
 
