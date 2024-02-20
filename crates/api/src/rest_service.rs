@@ -1,8 +1,10 @@
-use std::sync::LazyLock;
+use std::{ops::Deref, sync::LazyLock};
 
 use anyhow::Context;
+use hmac::{digest::KeyInit, Hmac};
+use jwt::SignWithKey;
 use poem_openapi::{param::Query, payload::PlainText, OpenApi};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub struct RestService;
 
@@ -15,7 +17,7 @@ pub struct RestService;
 
     2. Add the respective scopes:
     ```sh
-    kanidm system oauth2 update-scope-map sms_groups_client idm_all_accounts openid
+    kanidm system oauth2 update-scope-map sms_groups_client idm_all_accounts openid user
     ```
 
     3. Disable PKCE
@@ -36,13 +38,15 @@ const OAUTH2_TOKEN_ENDPOINT: &str = "https://localhost/oauth2/token";
 const CLIENT_ID: &str = "sms_groups_client";
 const CLIENT_PASS: &str = "vZHcY8HX0b6dgNAGDZqeAvFwgC9srgQVtHfKZu9d4Qv74Fhx";
 
-// WORKAROUND: localhost 443 (https) currently occupied by Kanidm
+// WORKAROUND: localhost:443 (https) currently occupied by Kanidm
 const CLIENT_ORIGIN: &str = "https://redirectmeto.com";
 const REAL_ORIGIN: &str = "http://localhost:3000";
 
+const JWT_SIGNATURE_SECRET: &[u8] = b"super_secret";
+
 #[OpenApi]
 impl RestService {
-    #[oai(path = "/login", method = "get")]
+    #[oai(path = "/user/login", method = "get")]
     async fn login(&self) -> PlainText<String> {
         let url = generate_authorization_request_url();
         return PlainText(format!("Please login at: {url}"));
@@ -52,8 +56,8 @@ impl RestService {
                 "{}?client_id={}&redirect_uri={}&scope={}&response_type=code&state={}",
                 OAUTH2_AUTH_ENDPOINT,
                 CLIENT_ID,
-                scopes_string(&["openid"]),
                 redirect_uri(),
+                scopes_string(&["openid", "user"]),
                 state()
             )
         }
@@ -74,7 +78,13 @@ impl RestService {
             .await
             .context("unable to convert token request to text")?;
 
-        return Ok(PlainText(response));
+        tracing::info!("Recieved token request response: {}", response);
+
+        validate_response(&response)?;
+
+        let sms_groups_jwt = create_sms_groups_jwt(&response)?;
+
+        return Ok(PlainText(format!("Bearer token: {}", sms_groups_jwt)));
 
         fn token_request_form(code: String) -> impl Serialize {
             [
@@ -104,4 +114,46 @@ fn scopes_string(scopes: &[&str]) -> String {
 
 fn state() -> String {
     "hejs".to_string()
+}
+
+fn validate_response(_response: &str) -> anyhow::Result<()> {
+    // Usual procedure... also verify that the user scope exists?
+    Ok(())
+}
+
+static JWT_SIGNING_KEY: LazyLock<Hmac<Sha256>> =
+    LazyLock::new(|| Hmac::<Sha256>::new_from_slice(JWT_SIGNATURE_SECRET).expect("unable to create JWT signing key"));
+
+fn create_sms_groups_jwt(_response: &str) -> anyhow::Result<String> {
+    // TODO: map expriy etc.
+    SmsGroupsJwt::mock().sign_with_key(JWT_SIGNING_KEY.deref()).map_err(Into::into)
+}
+
+use sha2::Sha256;
+pub use sms_groups_jwt::SmsGroupsJwt;
+mod sms_groups_jwt {
+    use bson::oid::ObjectId;
+
+    use super::*;
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub enum Group {
+        Admin,
+        User,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct SmsGroupsJwt {
+        group: Group,
+        id: ObjectId,
+    }
+
+    impl SmsGroupsJwt {
+        pub fn mock() -> Self {
+            Self {
+                group: Group::User,
+                id: ObjectId::new(),
+            }
+        }
+    }
 }
