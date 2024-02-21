@@ -34,8 +34,8 @@ pub struct RestService;
 const OAUTH2_AUTH_ENDPOINT: &str = "https://localhost/ui/oauth2";
 const OAUTH2_TOKEN_ENDPOINT: &str = "https://localhost/oauth2/token";
 
-const CLIENT_ID: &str = "sms_groups_client";
-const CLIENT_PASS: &str = "vZHcY8HX0b6dgNAGDZqeAvFwgC9srgQVtHfKZu9d4Qv74Fhx";
+const CLIENT_ID: &str = "sms_groups";
+const CLIENT_PASS: &str = "g5bZVuKajz9G8XPzSvF3d0UecdE0XHLCBXWDs3HAfH6LkNtc";
 
 // WORKAROUND: localhost:443 (https) currently occupied by Kanidm
 const CLIENT_ORIGIN: &str = "https://redirectmeto.com";
@@ -105,6 +105,16 @@ impl RestService {
             ]
         }
     }
+
+    #[oai(path = "/user/test_auth", method = "get")]
+    async fn test_user_auth(&self, UserAuthentication(user_id): UserAuthentication) -> PlainText<String> {
+        PlainText(format!("Logged in as a user with id: {}", user_id))
+    }
+
+    #[oai(path = "/admin/test_auth", method = "get")]
+    async fn test_admin_auth(&self, AdminAuthentication(admin_id): AdminAuthentication) -> PlainText<String> {
+        PlainText(format!("Logged in as an admin with id: {}", admin_id))
+    }
 }
 
 fn redirect_uri(group: Group) -> String {
@@ -136,7 +146,7 @@ mod sms_groups_jwt {
     use serde::{Deserialize, Serialize};
     use strum::AsRefStr;
 
-    #[derive(Debug, Clone, Copy, Serialize, Deserialize, AsRefStr)]
+    #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, AsRefStr)]
     #[strum(serialize_all = "kebab-case")]
     pub enum Group {
         Admin,
@@ -147,5 +157,44 @@ mod sms_groups_jwt {
     pub struct SmsGroupsJwt {
         pub group: Group,
         pub id: ObjectId,
+    }
+}
+
+pub use authentication::{AdminAuthentication, UserAuthentication};
+mod authentication {
+    use anyhow::anyhow;
+    use jwt::VerifyWithKey;
+    use poem::Request;
+    use poem_openapi::{auth::Bearer, SecurityScheme};
+
+    use super::*;
+
+    #[derive(SecurityScheme)]
+    #[oai(ty = "bearer", checker = "user_api_checker")]
+    pub struct UserAuthentication(pub ObjectId);
+
+    #[derive(SecurityScheme)]
+    #[oai(ty = "bearer", checker = "admin_api_checker")]
+    pub struct AdminAuthentication(pub ObjectId);
+
+    async fn user_api_checker(_req: &Request, bearer: Bearer) -> poem::Result<ObjectId> {
+        api_checker(Group::User, bearer).await
+    }
+
+    async fn admin_api_checker(_req: &Request, bearer: Bearer) -> poem::Result<ObjectId> {
+        api_checker(Group::Admin, bearer).await
+    }
+
+    async fn api_checker(expected_group: Group, bearer: Bearer) -> poem::Result<ObjectId> {
+        let jwt = bearer
+            .token
+            .verify_with_key(JWT_SIGNING_KEY.deref())
+            .context("unable to verify SMS Groups JWT")?;
+
+        let SmsGroupsJwt { group, id } = jwt;
+
+        (expected_group == group)
+            .then_some(id)
+            .ok_or(anyhow!("group mismatch, expected {}, got {}", expected_group.as_ref(), group.as_ref()).into())
     }
 }

@@ -47,7 +47,7 @@ impl RestServer {
             version,
         } = api_config.open_api;
 
-        let api_service = OpenApiService::new(RestService, service_name, version).server(&address);
+        let api_service = OpenApiService::new(RestService, service_name, version);
         let swagger_ui = api_service.swagger_ui();
         let app = Route::new()
             .nest("/", api_service.with(Tracing))
