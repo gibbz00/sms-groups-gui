@@ -26,6 +26,9 @@ bson.workspace = true
 futures.workspace = true
 hmac.workspace = true
 jwt.workspace = true
+openidconnect.workspace = true
+poem.workspace = true
+poem-openapi.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -33,6 +36,5 @@ sha2.workspace = true
 strum.workspace = true
 tracing.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+url.workspace = true
 uuid.workspace = true
-poem.workspace = true
-poem-openapi.workspace = true

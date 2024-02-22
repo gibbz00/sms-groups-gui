@@ -1,4 +1,4 @@
-use bson::{oid::ObjectId, Uuid};
+use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
 use crate::*;
@@ -7,7 +7,6 @@ use crate::*;
 pub struct Admin {
     #[serde(rename = "_id")]
     pub id: ObjectId,
-    pub idp_id: Uuid,
     pub name: String,
     pub organization: ObjectId,
 }

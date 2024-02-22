@@ -15,25 +15,16 @@ impl RestServer {
     }
 
     pub async fn seed(self) -> anyhow::Result<()> {
-        let RootCredentials { organization, admin } = SmsGroupsConfig::read()?.api.root_credentials;
+        let RootCredentials { organization } = SmsGroupsConfig::read()?.api.root_credentials;
 
         let root_organization = Organization {
             id: ObjectId::new(),
             parent_id: None,
             name: organization.name,
-            idp: organization.idp,
+            authorization_server: organization.authorization_server,
         };
 
-        let created_organization_id = self.db.create_document(&root_organization).await?;
-
-        let root_admin = Admin {
-            id: ObjectId::new(),
-            idp_id: admin.idp_id,
-            name: admin.name,
-            organization: created_organization_id,
-        };
-
-        self.db.create_document(&root_admin).await?;
+        self.db.create_document(&root_organization).await?;
 
         Ok(())
     }
@@ -47,7 +38,7 @@ impl RestServer {
             version,
         } = api_config.open_api;
 
-        let api_service = OpenApiService::new(RestService, service_name, version);
+        let api_service = OpenApiService::new(RestService { db: self.db }, service_name, version);
         let swagger_ui = api_service.swagger_ui();
         let app = Route::new()
             .nest("/", api_service.with(Tracing))
@@ -70,11 +61,10 @@ mod tests {
         MongoDbClient::in_test_container(|db| async move {
             RestServer::new(db.clone()).await.unwrap().seed().await.unwrap();
 
-            let admin_id = SmsGroupsConfig::read().unwrap().api.root_credentials.admin.idp_id;
-            let admin = db.stream::<Admin>(None).await.unwrap().next().await.unwrap().unwrap();
+            let create_organization = SmsGroupsConfig::read().unwrap().api.root_credentials.organization;
+            let found_organization = db.stream::<Organization>(None).await.unwrap().next().await.unwrap().unwrap();
 
-            assert_eq!(admin.idp_id, admin_id);
-            assert!(db.get_document::<Organization>(admin.organization).await.unwrap().is_some());
+            assert!(create_organization.implies(found_organization))
         })
         .await;
     }

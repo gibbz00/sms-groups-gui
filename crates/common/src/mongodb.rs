@@ -34,7 +34,7 @@ mod core {
     }
 
     impl MongoDbClient {
-        fn get_collection<T: MongoDbDocument>(&self) -> Collection<T> {
+        pub fn get_collection<T: MongoDbDocument>(&self) -> Collection<T> {
             self.collection::<T>(T::COLLECTION_NAME)
         }
 

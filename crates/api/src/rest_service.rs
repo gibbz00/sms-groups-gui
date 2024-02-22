@@ -1,12 +1,22 @@
 use std::{ops::Deref, sync::LazyLock};
 
 use anyhow::Context;
-use bson::oid::ObjectId;
+use bson::{doc, oid::ObjectId};
 use hmac::{digest::KeyInit, Hmac};
 use jwt::SignWithKey;
-use poem_openapi::{param::Query, payload::PlainText, OpenApi};
+use poem_openapi::{
+    param::{Path, Query},
+    payload::PlainText,
+    OpenApi,
+};
+use serde::Serialize;
+use sha2::Sha256;
+use sms_groups_common::*;
+use url::Url;
 
-pub struct RestService;
+pub struct RestService {
+    pub db: MongoDbClient,
+}
 
 /*
     1. Create a client at the IDM:
@@ -16,30 +26,20 @@ pub struct RestService;
 
     2. Add the respective scopes:
     ```sh
-    kanidm system oauth2 update-scope-map sms_groups_client idm_all_accounts openid user
+    kanidm system oauth2 update-scope-map sms_groups idm_all_accounts openid user
+    kanidm system oauth2 update-scope-map sms_groups idm_admins openid admin
     ```
 
     3. Disable PKCE
     ```sh
-    kanidm system oauth2 warning-insecure-client-disable-pkce sms_groups_client
+    kanidm system oauth2 warning-insecure-client-disable-pkce sms_groups
     ```
 
     4. Request the client password from IDM:
     ```
-    kanidm system oauth2 show-basic-secret sms_groups_client
+    kanidm system oauth2 show-basic-secret sms_groups
     ```
 */
-
-// IMPROVEMENT: could be created by only using the OpenID discover endpoint.
-const OAUTH2_AUTH_ENDPOINT: &str = "https://localhost/ui/oauth2";
-const OAUTH2_TOKEN_ENDPOINT: &str = "https://localhost/oauth2/token";
-
-const CLIENT_ID: &str = "sms_groups";
-const CLIENT_PASS: &str = "g5bZVuKajz9G8XPzSvF3d0UecdE0XHLCBXWDs3HAfH6LkNtc";
-
-// WORKAROUND: localhost:443 (https) currently occupied by Kanidm
-const CLIENT_ORIGIN: &str = "https://redirectmeto.com";
-const REAL_ORIGIN: &str = "http://localhost:3000";
 
 const JWT_SIGNATURE_SECRET: &[u8] = b"super_secret";
 static JWT_SIGNING_KEY: LazyLock<Hmac<Sha256>> =
@@ -54,32 +54,47 @@ static REQWEST_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
 
 #[OpenApi]
 impl RestService {
-    #[oai(path = "/user/login", method = "get")]
-    async fn login(&self) -> PlainText<String> {
-        // TODO: add  organization parameter
-        let url = generate_authorization_request_url(Group::User);
+    #[oai(path = "/user/login/:organization_name", method = "get")]
+    async fn login(&self, Path(organization_name): Path<String>) -> poem::Result<PlainText<String>> {
+        let found_organization = get_org_by_name(&self.db, &organization_name).await?;
+        let url = generate_authorization_request_url(found_organization, Group::User).await?;
 
-        return PlainText(format!("Please login at: {url}"));
+        return Ok(PlainText(format!("Please login at: {url}")));
 
-        fn generate_authorization_request_url(group: Group) -> String {
-            format!(
-                "{}?client_id={}&redirect_uri={}&scope={}&response_type=code&state=hejs",
-                OAUTH2_AUTH_ENDPOINT,
-                CLIENT_ID,
-                redirect_uri(group),
-                ["openid", group.as_ref()].join(" "),
-            )
+        async fn generate_authorization_request_url(organization: Organization, group: Group) -> anyhow::Result<Url> {
+            let mut authorization_endpoint = get_provider_metadata(organization.authorization_server.issuer_url)
+                .await?
+                .authorization_endpoint;
+            authorization_endpoint
+                .query_pairs_mut()
+                .append_pair("cliend_it", &organization.authorization_server.client_id)
+                .append_pair("response_type", "code")
+                .append_pair("redirect_uri", redirect_uri(group)?.as_str())
+                .append_pair("scope", &["openid", group.as_ref()].join(" "))
+                .append_pair("state", &organization.name);
+
+            Ok(authorization_endpoint)
         }
     }
 
     #[oai(path = "/user/redirect", method = "get", hidden)]
     // State query string could also be extracted.
-    async fn redirect(&self, Query(code): Query<String>) -> poem::Result<PlainText<String>> {
+    async fn redirect(&self, Query(code): Query<String>, Query(state): Query<String>) -> poem::Result<PlainText<String>> {
+        let organization_name = state;
+        let organization = get_org_by_name(&self.db, &organization_name).await?;
+
+        let token_endpoint = get_provider_metadata(organization.authorization_server.issuer_url)
+            .await?
+            .token_endpoint;
+
         let group = Group::User;
 
         let response = REQWEST_CLIENT
-            .post(OAUTH2_TOKEN_ENDPOINT)
-            .basic_auth(CLIENT_ID, Some(CLIENT_PASS))
+            .post(token_endpoint)
+            .basic_auth(
+                organization.authorization_server.client_id,
+                Some(organization.authorization_server.client_password),
+            )
             .form(&token_request_form(code, group))
             .send()
             .await
@@ -101,7 +116,7 @@ impl RestService {
                 ("grant_type", "authorization_code".to_string()),
                 ("code", code),
                 // Must be identical to the authorization request, but isn't being used by the token endpoint for redirection.
-                ("redirect_uri", redirect_uri(group)),
+                ("redirect_uri", redirect_uri(group).unwrap().to_string()),
             ]
         }
     }
@@ -117,8 +132,22 @@ impl RestService {
     }
 }
 
-fn redirect_uri(group: Group) -> String {
-    format!("{}/{}/{}/redirect", CLIENT_ORIGIN, REAL_ORIGIN, group.as_ref())
+async fn get_org_by_name(db: &MongoDbClient, organization_name: &str) -> anyhow::Result<Organization> {
+    db.get_collection::<Organization>()
+        .find_one(Some(doc! {"name": &organization_name}), None)
+        .await
+        .context("error communicating with database")?
+        .ok_or_else(|| anyhow::anyhow!("No organization found with name: {}", organization_name))
+}
+
+fn redirect_uri(group: Group) -> anyhow::Result<Url> {
+    SmsGroupsConfig::read()?
+        .api
+        .origin
+        .join("redirect/")
+        .expect("invalid url redirect concatenation")
+        .join(group.as_ref())
+        .map_err(Into::into)
 }
 
 fn validate_response(_response: &str) -> anyhow::Result<()> {
@@ -138,8 +167,6 @@ fn create_sms_groups_jwt(_response: &str, group: Group) -> anyhow::Result<String
         .map_err(Into::into)
 }
 
-use serde::Serialize;
-use sha2::Sha256;
 pub use sms_groups_jwt::{Group, SmsGroupsJwt};
 mod sms_groups_jwt {
     use bson::oid::ObjectId;
@@ -157,6 +184,49 @@ mod sms_groups_jwt {
     pub struct SmsGroupsJwt {
         pub group: Group,
         pub id: ObjectId,
+    }
+}
+
+pub use openid::get_provider_metadata;
+mod openid {
+    use std::ops::Deref;
+
+    use anyhow::Context;
+    use serde::Deserialize;
+    use url::Url;
+
+    const OPENID_DISCOVERY_POSTFIX: &str = ".well-known/openid-configuration";
+
+    pub async fn get_provider_metadata(issuer_url: Url) -> anyhow::Result<OpenIdProviderMetadatda> {
+        let metadata_url = {
+            let mut issuer_url = issuer_url.to_string();
+            if !issuer_url.ends_with('/') {
+                issuer_url.push('/')
+            }
+            issuer_url.push_str(OPENID_DISCOVERY_POSTFIX);
+            issuer_url
+        };
+
+        let x = super::REQWEST_CLIENT.deref().get(metadata_url).send().await?;
+
+        tracing::error!(?x, "got response");
+
+        let body = x.text().await.unwrap();
+        tracing::error!(body, "with body");
+
+        serde_json::from_str(&body).context("unable to request provider metadata")
+    }
+
+    /// Currently only using fields of interest.
+    /// https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+    #[derive(Deserialize)]
+    pub struct OpenIdProviderMetadatda {
+        pub issuer: Url,
+        pub authorization_endpoint: Url,
+        pub token_endpoint: Url,
+        pub userinfo_endpoint: Option<Url>,
+        pub jwks_uri: Url,
+        pub scopes_supported: Vec<String>,
     }
 }
 

@@ -2,6 +2,7 @@ instrumentation:
   log_dir: "/var/log"
 
 api:
+  origin: "https://sms-groups.gibbz.cloud"
   open_api:
     service_name: "SMS Groups API"
     swagger_ui_path: /swagger-ui
@@ -17,7 +18,7 @@ api:
   root_credentials:
     organization:
       name: "Gotanet"
-      idp: "<keymaker>"
-    admin:
-      name: "admin"
-      idp_id: "9442a1d3-c686-4e6d-869d-ed3f6265aad4"
+      authorization_server:
+        issuer_url: https://localhost/oauth2/openid/sms_groups
+        client_id: sms_groups
+        client_password: zKTBRFwdsTdWex0Y5Vytjb2XfdHh9W7dJCt5TjzAbZ0M2q5C
