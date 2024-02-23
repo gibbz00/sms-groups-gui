@@ -19,6 +19,6 @@ api:
     organization:
       name: "Gotanet"
       authorization_server:
-        issuer_url: https://localhost/oauth2/openid/sms_groups
+        issuer_url: https://idm.gibbz.cloud/oauth2/openid/sms_groups
         client_id: sms_groups
-        client_password: zKTBRFwdsTdWex0Y5Vytjb2XfdHh9W7dJCt5TjzAbZ0M2q5C
+        client_password: Sy9WEF9eCarKJUZRvDrCbTchwTVGTfC4eNPefk6jGbJCkL2T

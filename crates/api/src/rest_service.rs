@@ -18,29 +18,6 @@ pub struct RestService {
     pub db: MongoDbClient,
 }
 
-/*
-    1. Create a client at the IDM:
-    ```sh
-    kanidm system oauth2 create sms_groups_client "SMS Grupper API" "https://redirectmeto.com"
-    ```
-
-    2. Add the respective scopes:
-    ```sh
-    kanidm system oauth2 update-scope-map sms_groups idm_all_accounts openid user
-    kanidm system oauth2 update-scope-map sms_groups idm_admins openid admin
-    ```
-
-    3. Disable PKCE
-    ```sh
-    kanidm system oauth2 warning-insecure-client-disable-pkce sms_groups
-    ```
-
-    4. Request the client password from IDM:
-    ```
-    kanidm system oauth2 show-basic-secret sms_groups
-    ```
-*/
-
 const JWT_SIGNATURE_SECRET: &[u8] = b"super_secret";
 static JWT_SIGNING_KEY: LazyLock<Hmac<Sha256>> =
     LazyLock::new(|| Hmac::<Sha256>::new_from_slice(JWT_SIGNATURE_SECRET).expect("unable to create JWT signing key"));
@@ -62,7 +39,7 @@ impl RestService {
         return Ok(PlainText(format!("Please login at: {url}")));
 
         async fn generate_authorization_request_url(organization: Organization, group: Group) -> anyhow::Result<Url> {
-            let mut authorization_endpoint = get_provider_metadata(organization.authorization_server.issuer_url)
+            let mut authorization_endpoint = get_provider_metadata(&organization.authorization_server.issuer_url)
                 .await?
                 .authorization_endpoint;
             authorization_endpoint
@@ -83,7 +60,7 @@ impl RestService {
         let organization_name = state;
         let organization = get_org_by_name(&self.db, &organization_name).await?;
 
-        let token_endpoint = get_provider_metadata(organization.authorization_server.issuer_url)
+        let token_endpoint = get_provider_metadata(&organization.authorization_server.issuer_url)
             .await?
             .token_endpoint;
 
@@ -197,7 +174,7 @@ mod openid {
 
     const OPENID_DISCOVERY_POSTFIX: &str = ".well-known/openid-configuration";
 
-    pub async fn get_provider_metadata(issuer_url: Url) -> anyhow::Result<OpenIdProviderMetadatda> {
+    pub async fn get_provider_metadata(issuer_url: &Url) -> anyhow::Result<OpenIdProviderMetadatda> {
         let metadata_url = {
             let mut issuer_url = issuer_url.to_string();
             if !issuer_url.ends_with('/') {
@@ -227,6 +204,29 @@ mod openid {
         pub userinfo_endpoint: Option<Url>,
         pub jwks_uri: Url,
         pub scopes_supported: Vec<String>,
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use sms_groups_common::*;
+
+        use super::*;
+
+        #[tokio::test]
+        async fn gets_provider_metadata() {
+            let issuer_url = SmsGroupsConfig::read()
+                .unwrap()
+                .api
+                .root_credentials
+                .organization
+                .authorization_server
+                .issuer_url;
+
+            let provider_metadata = get_provider_metadata(&issuer_url).await.unwrap();
+
+            // returned issuer adds a port
+            assert_eq!(issuer_url.domain(), provider_metadata.issuer.domain())
+        }
     }
 }
 
